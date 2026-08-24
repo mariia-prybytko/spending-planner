@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Money, but make it dreamy — UK Spending Planner</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js" crossorigin></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" crossorigin></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Quicksand:wght@400;500;600;700&display=swap');
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: linear-gradient(160deg, #fff3f6 0%, #fef7fa 35%, #eef9ff 100%);
+    min-height: 100vh; font-family: 'Quicksand', sans-serif;
+    display: flex; justify-content: center; padding: 28px 14px;
+  }
+  #root { width: 100%; max-width: 980px; }
+
+  .planner {
+    --pink-deep: #e3577c; --pink: #e27094; --pink-light: #ffc8d3;
+    --sky: #9ddcfd; --blue: #94d4f8; --ink: #5c3f52; --ink-soft: #a5859a;
+    --card-solid: #fffbfd; --font-display: 'Fredoka', sans-serif; --font-body: 'Quicksand', sans-serif;
+    position: relative; color: var(--ink); border-radius: 26px; overflow: hidden;
+    background: #fffdfd; border: 1px solid #ffe1e9; box-shadow: 0 10px 40px rgba(227,87,124,0.12);
+  }
+  .planner-inner { position: relative; z-index: 1; }
+  .blob { position: absolute; border-radius: 50%; filter: blur(50px); opacity: 0.45; z-index: 0; pointer-events: none; }
+  .blob-a { width: 260px; height: 260px; background: var(--pink-light); top: -80px; right: -60px; }
+  .blob-b { width: 220px; height: 220px; background: var(--sky); bottom: -60px; left: -50px; }
+  .loading-state { display:flex; align-items:center; justify-content:center; gap:10px; padding: 60px 20px; color: var(--ink-soft); position: relative; z-index: 1; }
+  .spin { display:inline-block; animation: spin 1.1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .p-header { display:flex; align-items:center; justify-content:space-between; padding: 24px 28px 14px; flex-wrap: wrap; gap: 12px; }
+  .brand { display:flex; align-items:center; gap: 12px; }
+  .brand-mark { width: 42px; height: 42px; border-radius: 16px; display:flex; align-items:center; justify-content:center; font-size:18px;
+    background: linear-gradient(135deg, var(--pink-deep), var(--blue)); color: #fff; flex-shrink: 0; box-shadow: 0 6px 16px rgba(227,87,124,0.35); }
+  .brand h1 { font-family: var(--font-display); font-size: 21px; font-weight: 600; margin: 0; color: var(--pink-deep); }
+  .tagline { margin: 2px 0 0; font-size: 12.5px; color: var(--ink-soft); }
+  .month-nav { display:flex; align-items:center; gap: 8px; }
+  .month-nav button { background: #fff; border: 1px solid #ffd7e0; border-radius: 10px; width: 30px; height: 30px;
+    display:flex; align-items:center; justify-content:center; cursor:pointer; color: var(--pink-deep); font-size: 16px; }
+  .month-nav button:hover { background: var(--pink-light); }
+  .month-label { font-family: var(--font-display); font-size: 13.5px; font-weight: 500; min-width: 128px; text-align:center; color: var(--ink); }
+  .tabs { display:flex; gap: 6px; padding: 4px 24px 14px; overflow-x: auto; }
+  .tab { display:flex; align-items:center; gap:6px; background: rgba(255,255,255,0.6); border: 1px solid transparent;
+    padding: 8px 14px; border-radius: 30px; font-family: var(--font-body); font-size: 13px; font-weight: 600;
+    color: var(--ink-soft); cursor:pointer; white-space: nowrap; }
+  .tab:hover { background: #fff; }
+  .tab.active { background: linear-gradient(135deg, var(--pink-deep), var(--pink)); color: #fff; box-shadow: 0 4px 14px rgba(227,87,124,0.3); }
+  .p-main { padding: 6px 28px 10px; }
+  .grid-overview { display:grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .hero-card { grid-column: 1 / -1; background: var(--card-solid); border-radius: 22px; padding: 26px 30px; text-align:center;
+    border: 1px solid #ffe1e9; box-shadow: 0 6px 24px rgba(227,87,124,0.1); }
+  .hero-eyebrow { margin:0; font-size: 11.5px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--ink-soft); }
+  .hero-figure { font-family: var(--font-display); font-size: 46px; font-weight: 600; margin: 6px 0 14px; }
+  .hero-figure.pos { color: #4fae8a; } .hero-figure.neg { color: var(--pink-deep); }
+  .hero-split { display:flex; justify-content:center; gap: 24px; font-size: 13px; color: var(--ink-soft); flex-wrap: wrap; }
+  .hero-split strong { color: var(--ink); font-weight: 700; }
+  .dot { display:inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+  .dot.in { background: #4fae8a; } .dot.out { background: var(--pink-deep); } .dot.plan { background: var(--blue); }
+  .panel { background: var(--card-solid); border: 1px solid #ffe6ee; border-radius: 20px; padding: 20px 22px 22px;
+    box-shadow: 0 4px 18px rgba(227,87,124,0.06); }
+  .panel h2 { font-family: var(--font-display); font-size: 16px; font-weight: 600; margin: 0 0 4px; color: var(--pink-deep); }
+  .panel-sub { font-size: 12.5px; color: var(--ink-soft); margin: 0 0 14px; }
+  .empty-hint { font-size: 13px; color: var(--ink-soft); font-style: italic; margin: 6px 0 0; }
+  .report-panel { grid-column: 1 / -1; background: linear-gradient(135deg, #fff0f4, #eef9ff); border: 1px solid #ffd7e0; }
+  .report-text { font-size: 14.5px; line-height: 1.6; margin: 0; color: var(--ink); }
+  .two-col { display:grid; grid-template-columns: 300px 1fr; gap: 16px; align-items:start; }
+  .plan-grid { display:grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items:start; }
+  .swatch { display:inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 7px; }
+  .soft-list, .plan-input-list { list-style:none; margin: 8px 0 0; padding: 0; display:flex; flex-direction:column; }
+  .soft-row { display:flex; align-items:baseline; gap: 8px; padding: 9px 0; border-bottom: 1px dashed #ffdce6; }
+  .soft-row:last-child { border-bottom: none; }
+  .soft-row .desc { font-size: 13.5px; white-space: nowrap; display:flex; align-items:baseline; gap:6px; }
+  .soft-row .leader { flex:1; border-bottom: 1.5px dotted #ffc3d3; margin-bottom: 4px; min-width: 20px; }
+  .soft-row .amt { font-weight: 700; font-size: 13.5px; color: var(--pink-deep); white-space: nowrap; }
+  .cat-chip { font-size: 10.5px; color: var(--ink-soft); background: #fff0f4; border-radius: 20px; padding: 1px 8px; white-space: nowrap; }
+  .bill-row { gap: 10px; }
+  .check-btn { width: 18px; height: 18px; border-radius: 6px; border: 1.5px solid var(--pink); background: transparent;
+    display:flex; align-items:center; justify-content:center; cursor:pointer; color:#fff; flex-shrink: 0; padding: 0; font-size: 11px; }
+  .check-btn.checked { background: #4fae8a; border-color: #4fae8a; }
+  .icon-btn { background:none; border:none; color: var(--ink-soft); cursor:pointer; display:flex; align-items:center; justify-content:center; padding: 3px; flex-shrink: 0; font-size: 14px; }
+  .icon-btn:hover { color: var(--pink-deep); }
+  .entry-form { display:flex; flex-direction:column; gap: 12px; margin-top: 10px; }
+  .entry-form label { display:flex; flex-direction:column; gap:5px; font-size: 12px; color: var(--ink-soft); font-weight: 600; }
+  .entry-form input, .entry-form select { font-family: var(--font-body); font-size: 13.5px; padding: 9px 11px; border: 1.5px solid #ffdce6;
+    border-radius: 12px; background: #fffafb; color: var(--ink); }
+  .entry-form input:focus, .entry-form select:focus { outline: none; border-color: var(--pink); }
+  .primary-btn { display:flex; align-items:center; justify-content:center; gap:6px;
+    background: linear-gradient(135deg, var(--pink-deep), var(--pink)); color:#fff; border:none; border-radius: 30px;
+    padding: 11px; font-size: 13.5px; font-weight: 700; cursor:pointer; margin-top: 4px; box-shadow: 0 6px 16px rgba(227,87,124,0.3); width:100%; }
+  .primary-btn:hover { filter: brightness(1.05); }
+  .ghost-btn { display:flex; align-items:center; justify-content:center; gap: 6px; margin: 14px auto 0;
+    background: #fff0f4; color: var(--pink-deep); border: 1.5px solid #ffd2df; border-radius: 30px;
+    padding: 9px 16px; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+  .ghost-btn:hover { background: var(--pink-light); }
+  .bar-list { list-style:none; margin: 8px 0 0; padding: 0; display:flex; flex-direction:column; gap: 13px; }
+  .budget-bar-row { display:flex; flex-direction:column; gap: 4px; }
+  .budget-bar-labels { display:flex; justify-content:space-between; align-items:center; font-size: 12.5px; font-weight: 600; }
+  .budget-bar-labels .neg { color: var(--pink-deep); font-weight: 700; }
+  .bar-track { height: 9px; background: #fdeef2; border-radius: 20px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 20px; background: var(--blue); }
+  .bar-fill.over { background: var(--pink-deep); }
+  .pot-list { list-style:none; margin: 8px 0 0; padding:0; display:flex; flex-direction:column; gap:16px; }
+  .pot-row { display:flex; flex-direction:column; gap:6px; }
+  .pot-head { display:flex; justify-content:space-between; align-items:baseline; font-size: 13.5px; }
+  .pot-name { font-weight: 700; } .pot-figures { font-size: 12.5px; color: var(--ink-soft); font-weight: 600; }
+  .of { font-weight: 400; } .pot-track { height: 10px; }
+  .pot-fill { background: linear-gradient(90deg, var(--pink), var(--blue)); }
+  .pot-actions { display:flex; gap:6px; margin-top: 2px; align-items:center; }
+  .pot-actions input { flex:1; font-size: 12.5px; padding: 7px 9px; border: 1.5px solid #ffdce6; border-radius: 10px; background:#fffafb; color: var(--ink); }
+  .pot-actions .icon-btn { border: 1.5px solid #ffdce6; border-radius: 8px; width: 27px; height: 27px; }
+  .plan-chart-panel { display:flex; flex-direction:column; align-items:center; text-align:center; }
+  .donut-wrap { position: relative; width: 100%; max-width: 280px; margin: 4px auto 0; display:flex; align-items:center; justify-content:center; }
+  .donut-empty { display:flex; flex-direction:column; align-items:center; gap: 8px; padding: 60px 10px; color: var(--ink-soft); font-size: 13px; }
+  .donut-center { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    display:flex; flex-direction:column; align-items:center; pointer-events: none; }
+  .donut-total { font-family: var(--font-display); font-size: 22px; font-weight: 700; color: var(--pink-deep); }
+  .donut-sub { font-size: 10.5px; color: var(--ink-soft); }
+  .plan-diff { font-size: 12.5px; font-weight: 600; margin: 12px 0 0; }
+  .plan-diff.pos { color: #4fae8a; } .plan-diff.neg { color: var(--pink-deep); }
+  .plan-input-row, .spend-row { display:flex; flex-direction:column; gap: 6px; padding: 10px 0; border-bottom: 1px dashed #ffe6ee; }
+  .plan-input-row:last-child, .spend-row:last-child { border-bottom: none; }
+  .plan-input-label { display:flex; justify-content:space-between; align-items:center; font-size: 13px; font-weight: 600; }
+  .suggested-hint { font-size: 11px; color: var(--ink-soft); font-weight: 500; }
+  .suggested-hint.neg { color: var(--pink-deep); }
+  .plan-input-controls { display:flex; align-items:center; gap: 10px; }
+  .plan-input-controls input[type="range"] { flex: 1; }
+  .mini-amount { display:flex; align-items:center; gap: 3px; background:#fffafb; border: 1.5px solid #ffdce6;
+    border-radius: 10px; padding: 5px 9px; font-size: 13px; font-weight: 600; color: var(--ink-soft); width: 90px; }
+  .mini-amount input { border:none; background:none; width: 100%; font-family: var(--font-body); font-size: 13px; font-weight: 700; color: var(--ink); outline: none; }
+  .income-row { display:flex; justify-content:space-between; align-items:center; padding: 10px 0 14px; border-bottom: 2px dashed var(--sky); margin-bottom: 6px; }
+  .income-amount { width: 110px; border-color: var(--sky); }
+  .p-footer { padding: 8px 28px 18px; font-size: 11.5px; color: var(--ink-soft); text-align:right; position: relative; z-index: 1; }
+  .p-footer .err { color: var(--pink-deep); }
+  @media (max-width: 640px) {
+    .grid-overview, .two-col, .plan-grid { grid-template-columns: 1fr; }
+    .p-header { flex-direction: column; align-items: flex-start; }
+    .p-main { padding: 6px 16px; }
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useCallback, useMemo } = React;
+
+/* ---- Cross-device sync setup ----
+   1. Create a free project at supabase.com
+   2. In the SQL Editor, run:
+        create table planner_data (
+          code text primary key,
+          data jsonb not null,
+          updated_at timestamptz default now()
+        );
+        alter table planner_data enable row level security;
+        create policy "Allow anon read" on planner_data for select using (true);
+        create policy "Allow anon write" on planner_data for insert with check (true);
+        create policy "Allow anon update" on planner_data for update using (true);
+   3. In Project Settings > API, copy your Project URL and anon public key below.
+   4. Save this file, host/open it, then set a personal passcode in the Sync tab.
+   Note: the policies above are open (anyone with your passcode + this file can read/write
+   that row) — fine for personal convenience, not bank-grade security. Pick a passcode
+   that isn't easy to guess.
+------------------------------------------------------------------------------- */
+const SUPABASE_URL = "https://yifnoffezgjsjklitpjt.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlpZm5vZmZlemdqc2prbGl0cGp0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc1NzQwOTIsImV4cCI6MjEwMzE1MDA5Mn0.n3EsvACH68cLIq5w41Kdtp8uKkIEK2nkG1lflGMaYqw";
+const supabaseConfigured = SUPABASE_URL.startsWith('http') && SUPABASE_ANON_KEY.length > 20;
+const sbClient = supabaseConfigured ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+const PASSCODE_KEY = 'uk-spending-planner-passcode';
+
+const STORAGE_KEY = 'uk-spending-planner-v2';
+const CATEGORIES = ['Groceries','Car Expenses','Transport','Eating Out','Shopping','Subscriptions','Health','Entertainment','Other'];
+const SUGGESTED = { 'Groceries':250,'Car Expenses':180,'Transport':50,'Eating Out':90,'Shopping':100,'Subscriptions':35,'Health':30,'Entertainment':60,'Other':50 };
+
+function lighten(hex, amt) {
+  const num = parseInt(hex.slice(1), 16);
+  let r = (num >> 16) + Math.round(255 * amt);
+  let g = ((num >> 8) & 0x00ff) + Math.round(255 * amt);
+  let b = (num & 0x0000ff) + Math.round(255 * amt);
+  r = Math.min(255, r); g = Math.min(255, g); b = Math.min(255, b);
+  return '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+}
+const BASE_COLORS = ['#e3577c', '#e27094', '#ffc8d3', '#9ddcfd', '#94d4f8'];
+const CATEGORY_COLORS = CATEGORIES.reduce((acc, cat, i) => {
+  acc[cat] = i < 5 ? BASE_COLORS[i] : lighten(BASE_COLORS[i - 5], 0.35);
+  return acc;
+}, {});
+
+const fmtGBP = (n) => new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', maximumFractionDigits: 0 }).format(Number.isFinite(n) ? n : 0);
+const monthKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+const monthLabel = (d) => d.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+const uid = () => Math.random().toString(36).slice(2, 10);
+const emptyData = () => ({ income: {}, spent: {}, plan: {}, pots: [], bills: [] });
+function ordinalSuffix(n) { const j = n % 10, k = n % 100; if (j === 1 && k !== 11) return 'st'; if (j === 2 && k !== 12) return 'nd'; if (j === 3 && k !== 13) return 'rd'; return 'th'; }
+
+function buildMonthlyReport({ monthName, income, totalSpent, rows, pots, bills, mKey }) {
+  const sentences = [];
+  const net = income - totalSpent;
+  if (income > 0) {
+    sentences.push(net >= 0
+      ? `In ${monthName}, you brought in ${fmtGBP(income)} and spent ${fmtGBP(totalSpent)} — leaving you ${fmtGBP(net)} ahead.`
+      : `In ${monthName}, you spent ${fmtGBP(totalSpent)} against ${fmtGBP(income)} of income — ${fmtGBP(Math.abs(net))} more than came in.`);
+  } else if (totalSpent > 0) {
+    sentences.push(`You've logged ${fmtGBP(totalSpent)} of spending in ${monthName} so far.`);
+  } else {
+    sentences.push(`No spending logged for ${monthName} yet — add some numbers in Log Spending to get a picture of the month.`);
+  }
+  const spentRows = rows.filter((r) => r.spent > 0).sort((a, b) => b.spent - a.spent);
+  if (spentRows.length) sentences.push(`Most of that went on ${spentRows[0].category}, at ${fmtGBP(spentRows[0].spent)}.`);
+  const overRows = rows.filter((r) => r.planned > 0 && r.spent > r.planned);
+  if (overRows.length === 1) sentences.push(`${overRows[0].category} ran ${fmtGBP(overRows[0].spent - overRows[0].planned)} over plan — worth watching next month.`);
+  else if (overRows.length > 1) sentences.push(`A few categories ran over plan: ${overRows.map((r) => r.category).join(', ')}.`);
+  else if (rows.some((r) => r.planned > 0) && spentRows.length) sentences.push(`Everything stayed within plan this month — nicely done.`);
+  if (pots.length) {
+    const withProgress = pots.filter((p) => p.target > 0);
+    if (withProgress.length) {
+      const closest = [...withProgress].sort((a, b) => b.saved / b.target - a.saved / a.target)[0];
+      const pct = Math.round((closest.saved / closest.target) * 100);
+      sentences.push(`Your ${closest.name} pot is ${pct}% of the way to its ${fmtGBP(closest.target)} target.`);
+    }
+  }
+  if (bills.length) {
+    const unpaid = bills.filter((b) => !b.paidMonths.includes(mKey));
+    sentences.push(unpaid.length === 0
+      ? `All your bills are marked paid for ${monthName}.`
+      : `${unpaid.length} bill${unpaid.length > 1 ? 's' : ''} still due, totalling ${fmtGBP(unpaid.reduce((s, b) => s + b.amount, 0))}.`);
+  }
+  return sentences.join(' ');
+}
+
+function DonutChart({ data, size = 240, thickness = 32 }) {
+  const total = data.reduce((s, d) => s + d.value, 0);
+  const radius = (size - thickness) / 2;
+  const circumference = 2 * Math.PI * radius;
+  let cumulative = 0;
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+      <g transform={`rotate(-90 ${size / 2} ${size / 2})`}>
+        {total === 0 ? (
+          <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="#fdeef2" strokeWidth={thickness} />
+        ) : data.map((d) => {
+          const frac = d.value / total;
+          const dash = frac * circumference;
+          const offset = -cumulative * circumference;
+          cumulative += frac;
+          return (
+            <circle key={d.name} cx={size / 2} cy={size / 2} r={radius} fill="none" stroke={d.color}
+              strokeWidth={thickness} strokeDasharray={`${dash} ${circumference - dash}`} strokeDashoffset={offset}
+              strokeLinecap={data.length > 1 ? 'butt' : 'round'}>
+              <title>{d.name}: {fmtGBP(d.value)}</title>
+            </circle>
+          );
+        })}
+      </g>
+    </svg>
+  );
+}
+
+function UKSpendingPlanner() {
+  const [ready, setReady] = useState(false);
+  const [status, setStatus] = useState('idle');
+  const [tab, setTab] = useState('overview');
+  const [cursor, setCursor] = useState(new Date());
+  const [data, setData] = useState(emptyData());
+  const [passcode, setPasscode] = useState('');
+
+  useEffect(() => {
+    (async () => {
+      let local = emptyData();
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) local = { ...emptyData(), ...JSON.parse(raw) };
+      } catch (e) {}
+      setData(local);
+
+      const savedCode = localStorage.getItem(PASSCODE_KEY) || '';
+      if (savedCode) {
+        setPasscode(savedCode);
+        if (sbClient) {
+          setStatus('saving');
+          try {
+            const { data: row, error } = await sbClient.from('planner_data').select('data').eq('code', savedCode).maybeSingle();
+            if (error) throw error;
+            if (row && row.data) {
+              setData({ ...emptyData(), ...row.data });
+              localStorage.setItem(STORAGE_KEY, JSON.stringify(row.data));
+            } else {
+              await sbClient.from('planner_data').upsert({ code: savedCode, data: local, updated_at: new Date().toISOString() });
+            }
+            setStatus('synced');
+          } catch (e) { setStatus('sync-error'); }
+        }
+      }
+      setReady(true);
+    })();
+  }, []);
+
+  const persist = useCallback((next) => {
+    setData(next);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    if (sbClient && passcode) {
+      setStatus('saving');
+      sbClient.from('planner_data').upsert({ code: passcode, data: next, updated_at: new Date().toISOString() })
+        .then(({ error }) => setStatus(error ? 'sync-error' : 'synced'))
+        .catch(() => setStatus('sync-error'));
+    } else {
+      setStatus('idle');
+    }
+  }, [passcode]);
+
+  const connectSync = useCallback(async (code) => {
+    if (!code.trim()) return;
+    setPasscode(code);
+    localStorage.setItem(PASSCODE_KEY, code);
+    if (!sbClient) { setStatus('sync-error'); return; }
+    setStatus('saving');
+    try {
+      const { data: row, error } = await sbClient.from('planner_data').select('data').eq('code', code).maybeSingle();
+      if (error) throw error;
+      if (row && row.data) {
+        setData({ ...emptyData(), ...row.data });
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(row.data));
+      } else {
+        await sbClient.from('planner_data').upsert({ code, data, updated_at: new Date().toISOString() });
+      }
+      setStatus('synced');
+    } catch (e) { setStatus('sync-error'); }
+  }, [data]);
+
+  const disconnectSync = useCallback(() => {
+    setPasscode('');
+    localStorage.removeItem(PASSCODE_KEY);
+    setStatus('idle');
+  }, []);
+
+  const mKey = monthKey(cursor);
+  const monthSpent = data.spent[mKey] || {};
+  const monthIncome = data.income[mKey] || 0;
+  const totalSpent = useMemo(() => Object.values(monthSpent).reduce((s, v) => s + (v || 0), 0), [monthSpent]);
+  const totalPlan = useMemo(() => CATEGORIES.reduce((s, c) => s + (data.plan[c] ?? 0), 0), [data.plan]);
+
+  const setIncome = (value) => persist({ ...data, income: { ...data.income, [mKey]: value } });
+  const setSpend = (category, value) => persist({ ...data, spent: { ...data.spent, [mKey]: { ...monthSpent, [category]: value } } });
+  const setPlan = (category, value) => persist({ ...data, plan: { ...data.plan, [category]: value } });
+  const applySuggested = () => persist({ ...data, plan: { ...SUGGESTED } });
+  const addPot = (pot) => persist({ ...data, pots: [...data.pots, { id: uid(), saved: 0, ...pot }] });
+  const contributeToPot = (id, amount) => persist({ ...data, pots: data.pots.map((p) => (p.id === id ? { ...p, saved: Math.max(0, p.saved + amount) } : p)) });
+  const removePot = (id) => persist({ ...data, pots: data.pots.filter((p) => p.id !== id) });
+  const addBill = (bill) => persist({ ...data, bills: [...data.bills, { id: uid(), paidMonths: [], ...bill }] });
+  const removeBill = (id) => persist({ ...data, bills: data.bills.filter((b) => b.id !== id) });
+  const toggleBillPaid = (id) => persist({ ...data, bills: data.bills.map((b) => {
+    if (b.id !== id) return b;
+    const paid = b.paidMonths.includes(mKey);
+    return { ...b, paidMonths: paid ? b.paidMonths.filter((m) => m !== mKey) : [...b.paidMonths, mKey] };
+  }) });
+
+  if (!ready) {
+    return <div className="planner"><div className="loading-state"><span className="spin">🔁</span><span>Fluffing up your dashboard…</span></div></div>;
+  }
+
+  return (
+    <div className="planner">
+      <div className="blob blob-a" /><div className="blob blob-b" />
+      <div className="planner-inner">
+        <header className="p-header">
+          <div className="brand">
+            <span className="brand-mark">✨</span>
+            <div><h1>Money, but make it dreamy</h1><p className="tagline">Your soft-and-sweet UK spending planner</p></div>
+          </div>
+          <div className="month-nav">
+            <button onClick={() => setCursor(new Date(cursor.getFullYear(), cursor.getMonth() - 1, 1))}>‹</button>
+            <span className="month-label">{monthLabel(cursor)}</span>
+            <button onClick={() => setCursor(new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1))}>›</button>
+          </div>
+        </header>
+        <nav className="tabs">
+          {[['overview','Dashboard','📊'],['plan','Build my Plan','🥧'],['spending','Log Spending','💳'],['pots','Savings Pots','🐷'],['bills','Bills','🔁'],['sync','Sync','☁️']].map(([id,label,icon]) => (
+            <button key={id} className={tab === id ? 'tab active' : 'tab'} onClick={() => setTab(id)}><span>{icon}</span>{label}</button>
+          ))}
+        </nav>
+        <main className="p-main">
+          {tab === 'overview' && <Overview income={monthIncome} totalSpent={totalSpent} totalPlan={totalPlan} plan={data.plan} spent={monthSpent} pots={data.pots} bills={data.bills} mKey={mKey} monthName={monthLabel(cursor)} />}
+          {tab === 'plan' && <PlanBuilder plan={data.plan} totalPlan={totalPlan} income={monthIncome} onSetPlan={setPlan} onApplySuggested={applySuggested} />}
+          {tab === 'spending' && <SpendingLog income={monthIncome} spent={monthSpent} plan={data.plan} onSetIncome={setIncome} onSetSpend={setSpend} />}
+          {tab === 'pots' && <Pots pots={data.pots} onAdd={addPot} onContribute={contributeToPot} onRemove={removePot} />}
+          {tab === 'bills' && <Bills bills={data.bills} mKey={mKey} onAdd={addBill} onRemove={removeBill} onTogglePaid={toggleBillPaid} />}
+          {tab === 'sync' && <SyncPanel passcode={passcode} status={status} onConnect={connectSync} onDisconnect={disconnectSync} />}
+        </main>
+        <footer className="p-footer">
+          {status === 'saving' && <span>Saving…</span>}
+          {status === 'synced' && <span>Synced to the cloud ☁️</span>}
+          {status === 'sync-error' && <span className="err">Sync couldn't reach Supabase — check the Sync tab.</span>}
+          {status === 'idle' && <span>Saved to this browser ✨</span>}
+        </footer>
+      </div>
+    </div>
+  );
+}
+
+function EmptyHint({ text }) { return <p className="empty-hint">{text}</p>; }
+
+function PlanBar({ category, planned, spent }) {
+  const pct = planned > 0 ? Math.min(100, (spent / planned) * 100) : 0;
+  const over = spent > planned;
+  return (
+    <li className="budget-bar-row">
+      <div className="budget-bar-labels">
+        <span><i className="swatch" style={{ background: CATEGORY_COLORS[category] }} />{category}</span>
+        <span className={over ? 'neg' : ''}>{fmtGBP(spent)} / {fmtGBP(planned)}</span>
+      </div>
+      <div className="bar-track"><div className={over ? 'bar-fill over' : 'bar-fill'} style={{ width: `${pct}%`, background: over ? undefined : CATEGORY_COLORS[category] }} /></div>
+    </li>
+  );
+}
+
+function Overview({ income, totalSpent, totalPlan, plan, spent, pots, bills, mKey, monthName }) {
+  const net = income - totalSpent;
+  const rows = CATEGORIES.map((c) => ({ category: c, planned: plan[c] ?? SUGGESTED[c], spent: spent[c] || 0 })).filter((r) => r.planned || r.spent);
+  const upcomingBills = bills.filter((b) => !b.paidMonths.includes(mKey)).sort((a, b) => a.dueDay - b.dueDay);
+  const report = useMemo(() => buildMonthlyReport({ monthName, income, totalSpent, rows, pots, bills, mKey }), [monthName, income, totalSpent, rows, pots, bills, mKey]);
+
+  return (
+    <div className="grid-overview">
+      <section className="hero-card">
+        <p className="hero-eyebrow">Left this month</p>
+        <p className={net >= 0 ? 'hero-figure pos' : 'hero-figure neg'}>{fmtGBP(net)}</p>
+        <div className="hero-split">
+          <div><span className="dot in" /> Income <strong>{fmtGBP(income)}</strong></div>
+          <div><span className="dot out" /> Spent <strong>{fmtGBP(totalSpent)}</strong></div>
+          <div><span className="dot plan" /> Planned <strong>{fmtGBP(totalPlan)}</strong></div>
+        </div>
+      </section>
+      <section className="panel report-panel"><h2>Your month in words</h2><p className="report-text">{report}</p></section>
+      <section className="panel">
+        <h2>Spending vs your plan</h2>
+        {rows.length === 0 ? <EmptyHint text="Build a plan and log some spending to see how you're tracking." /> :
+          <ul className="bar-list">{rows.map((r) => <PlanBar key={r.category} category={r.category} planned={r.planned} spent={r.spent} />)}</ul>}
+      </section>
+      <section className="panel">
+        <h2>Savings pots</h2>
+        {pots.length === 0 ? <EmptyHint text="Open a pot in the Savings Pots tab." /> :
+          <ul className="pot-list">{pots.slice(0, 4).map((p) => <PotRow key={p.id} pot={p} readOnly />)}</ul>}
+      </section>
+      <section className="panel">
+        <h2>Bills still due</h2>
+        {upcomingBills.length === 0 ? <EmptyHint text="All bills marked paid this month." /> :
+          <ul className="soft-list">{upcomingBills.map((b) => (
+            <li className="soft-row" key={b.id}><span className="desc">Due {b.dueDay}<sup>{ordinalSuffix(b.dueDay)}</sup> · {b.name}</span><span className="leader" /><span className="amt">{fmtGBP(b.amount)}</span></li>
+          ))}</ul>}
+      </section>
+    </div>
+  );
+}
+
+function PlanBuilder({ plan, totalPlan, income, onSetPlan, onApplySuggested }) {
+  const chartData = CATEGORIES.map((c) => ({ name: c, value: plan[c] ?? 0, color: CATEGORY_COLORS[c] })).filter((d) => d.value > 0);
+  const diff = income ? income - totalPlan : null;
+  return (
+    <div className="plan-grid">
+      <section className="panel plan-chart-panel">
+        <h2>Your plan, at a glance</h2>
+        <div className="donut-wrap">
+          {chartData.length === 0 ? <div className="donut-empty"><span style={{fontSize:32}}>🥧</span><p>Add amounts to see your circle come to life</p></div> : <DonutChart data={chartData} />}
+          <div className="donut-center"><span className="donut-total">{fmtGBP(totalPlan)}</span><span className="donut-sub">planned / month</span></div>
+        </div>
+        {income > 0 && <p className={diff >= 0 ? 'plan-diff pos' : 'plan-diff neg'}>{diff >= 0 ? `£${diff.toFixed(0)} left unplanned from your income` : `Over income by ${fmtGBP(Math.abs(diff))}`}</p>}
+        <button className="ghost-btn" onClick={onApplySuggested}>✨ Fill with suggested amounts</button>
+      </section>
+      <section className="panel">
+        <h2>Set amounts per category</h2>
+        <p className="panel-sub">Drag the slider or type an amount — the circle updates as you go.</p>
+        <ul className="plan-input-list">
+          {CATEGORIES.map((cat) => (
+            <li key={cat} className="plan-input-row">
+              <div className="plan-input-label"><span><i className="swatch" style={{ background: CATEGORY_COLORS[cat] }} />{cat}</span><span className="suggested-hint">suggested {fmtGBP(SUGGESTED[cat])}</span></div>
+              <div className="plan-input-controls">
+                <input type="range" min="0" max="500" step="5" value={plan[cat] ?? 0} onChange={(e) => onSetPlan(cat, parseFloat(e.target.value))} style={{ accentColor: CATEGORY_COLORS[cat] }} />
+                <div className="mini-amount"><span>£</span><input type="number" min="0" step="5" value={plan[cat] ?? ''} placeholder="0" onChange={(e) => onSetPlan(cat, parseFloat(e.target.value) || 0)} /></div>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </section>
+    </div>
+  );
+}
+
+function SpendingLog({ income, spent, plan, onSetIncome, onSetSpend }) {
+  return (
+    <div className="panel">
+      <h2>Log this month's spending</h2>
+      <p className="panel-sub">Type your running total for each category — no need to log every purchase.</p>
+      <div className="income-row">
+        <div className="plan-input-label"><span><i className="swatch" style={{ background: '#94d4f8' }} />Income this month</span></div>
+        <div className="mini-amount income-amount"><span>£</span><input type="number" min="0" step="10" value={income || ''} placeholder="0" onChange={(e) => onSetIncome(parseFloat(e.target.value) || 0)} /></div>
+      </div>
+      <ul className="plan-input-list">
+        {CATEGORIES.map((cat) => {
+          const planned = plan[cat] ?? SUGGESTED[cat];
+          const over = (spent[cat] || 0) > planned;
+          return (
+            <li key={cat} className="spend-row">
+              <div className="plan-input-label"><span><i className="swatch" style={{ background: CATEGORY_COLORS[cat] }} />{cat}</span><span className={over ? 'neg suggested-hint' : 'suggested-hint'}>plan {fmtGBP(planned)}</span></div>
+              <div className="mini-amount"><span>£</span><input type="number" min="0" step="1" value={spent[cat] ?? ''} placeholder="0" onChange={(e) => onSetSpend(cat, parseFloat(e.target.value) || 0)} /></div>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+function SyncPanel({ passcode, status, onConnect, onDisconnect }) {
+  const [input, setInput] = useState('');
+  const connected = !!passcode;
+
+  if (!supabaseConfigured) {
+    return (
+      <div className="panel">
+        <h2>Cross-device sync</h2>
+        <p className="panel-sub">Not set up yet.</p>
+        <p className="report-text">
+          To turn this on: create a free project at supabase.com, run the setup SQL from the comment at the top of
+          this file's script, then paste your Project URL and anon public key into the <code>SUPABASE_URL</code> and{' '}
+          <code>SUPABASE_ANON_KEY</code> constants near the top of the file. Save it, reopen it, and this tab will
+          let you connect.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="panel">
+      <h2>Cross-device sync</h2>
+      {connected ? (
+        <>
+          <p className="panel-sub">
+            Connected with passcode <strong>{passcode}</strong>
+            {status === 'synced' && ' — up to date ☁️'}
+            {status === 'saving' && ' — syncing…'}
+            {status === 'sync-error' && ' — couldn\'t reach the server, will retry on your next change'}
+          </p>
+          <p className="report-text">Enter this same passcode on any other device to see the same data there.</p>
+          <button className="ghost-btn" onClick={onDisconnect}>Disconnect this device</button>
+        </>
+      ) : (
+        <>
+          <p className="panel-sub">Set a personal passcode to sync your plan across devices. Use the same one everywhere.</p>
+          <form className="entry-form" onSubmit={(e) => { e.preventDefault(); onConnect(input.trim()); }}>
+            <label>Passcode
+              <input type="text" placeholder="e.g. a memorable word or phrase" value={input} onChange={(e) => setInput(e.target.value)} />
+            </label>
+            <button type="submit" className="primary-btn">Connect</button>
+          </form>
+        </>
+      )}
+    </div>
+  );
+}
+
+function Pots({ pots, onAdd, onContribute, onRemove }) {
+  const [form, setForm] = useState({ name: '', target: '' });
+  const submit = (e) => { e.preventDefault(); const target = parseFloat(form.target); if (!form.name.trim() || !target || target <= 0) return; onAdd({ name: form.name, target }); setForm({ name: '', target: '' }); };
+  return (
+    <div className="two-col">
+      <section className="panel">
+        <h2>Open a new pot</h2>
+        <form className="entry-form" onSubmit={submit}>
+          <label>Pot name<input type="text" placeholder="e.g. Holiday, Rainy day" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label>
+          <label>Target amount (£)<input type="number" min="0" step="1" placeholder="500" value={form.target} onChange={(e) => setForm({ ...form, target: e.target.value })} /></label>
+          <button type="submit" className="primary-btn">+ Open pot</button>
+        </form>
+      </section>
+      <section className="panel">
+        <h2>Your pots</h2>
+        {pots.length === 0 ? <EmptyHint text="No pots opened yet." /> : <ul className="pot-list">{pots.map((p) => <PotRow key={p.id} pot={p} onContribute={onContribute} onRemove={onRemove} />)}</ul>}
+      </section>
+    </div>
+  );
+}
+
+function PotRow({ pot, onContribute, onRemove, readOnly }) {
+  const [amt, setAmt] = useState('');
+  const pct = pot.target > 0 ? Math.min(100, (pot.saved / pot.target) * 100) : 0;
+  return (
+    <li className="pot-row">
+      <div className="pot-head"><span className="pot-name">{pot.name}</span><span className="pot-figures">{fmtGBP(pot.saved)} <span className="of">of</span> {fmtGBP(pot.target)}</span></div>
+      <div className="bar-track pot-track"><div className="bar-fill pot-fill" style={{ width: `${pct}%` }} /></div>
+      {!readOnly && (
+        <div className="pot-actions">
+          <input type="number" min="0" step="1" placeholder="Add £" value={amt} onChange={(e) => setAmt(e.target.value)} />
+          <button className="icon-btn" onClick={() => { const v = parseFloat(amt); if (v > 0) { onContribute(pot.id, v); setAmt(''); } }}>+</button>
+          <button className="icon-btn" onClick={() => onRemove(pot.id)}>✕</button>
+        </div>
+      )}
+    </li>
+  );
+}
+
+function Bills({ bills, mKey, onAdd, onRemove, onTogglePaid }) {
+  const [form, setForm] = useState({ name: '', amount: '', dueDay: '1', category: CATEGORIES[0] });
+  const submit = (e) => { e.preventDefault(); const amount = parseFloat(form.amount); const dueDay = parseInt(form.dueDay, 10);
+    if (!form.name.trim() || !amount || amount <= 0 || !dueDay || dueDay < 1 || dueDay > 31) return;
+    onAdd({ name: form.name, amount, dueDay, category: form.category }); setForm({ name: '', amount: '', dueDay: '1', category: form.category }); };
+  const sorted = [...bills].sort((a, b) => a.dueDay - b.dueDay);
+  return (
+    <div className="two-col">
+      <section className="panel">
+        <h2>Add a recurring bill</h2>
+        <form className="entry-form" onSubmit={submit}>
+          <label>Bill name<input type="text" placeholder="e.g. Car insurance, Netflix" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label>
+          <label>Category<select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>{CATEGORIES.map((c) => <option key={c}>{c}</option>)}</select></label>
+          <label>Amount (£)<input type="number" min="0" step="0.01" placeholder="0.00" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></label>
+          <label>Due day of month<input type="number" min="1" max="31" value={form.dueDay} onChange={(e) => setForm({ ...form, dueDay: e.target.value })} /></label>
+          <button type="submit" className="primary-btn">+ Add bill</button>
+        </form>
+      </section>
+      <section className="panel">
+        <h2>Standing bills</h2>
+        {sorted.length === 0 ? <EmptyHint text="No recurring bills yet." /> : (
+          <ul className="soft-list">
+            {sorted.map((b) => {
+              const paid = b.paidMonths.includes(mKey);
+              return (
+                <li className="soft-row bill-row" key={b.id}>
+                  <button className={paid ? 'check-btn checked' : 'check-btn'} onClick={() => onTogglePaid(b.id)}>{paid ? '✓' : ''}</button>
+                  <span className="desc">Due {b.dueDay}<sup>{ordinalSuffix(b.dueDay)}</sup> · {b.name}<span className="cat-chip">{b.category}</span></span>
+                  <span className="leader" /><span className="amt">{fmtGBP(b.amount)}</span>
+                  <button className="icon-btn" onClick={() => onRemove(b.id)}>✕</button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<UKSpendingPlanner />);
+</script>
+</body>
+</html>
